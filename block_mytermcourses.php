@@ -21,10 +21,8 @@
  * 95011 Cergy-Pontoise cedex
  * FRANCE
  *
- * Displays the courses within which the user his enrolled, their categories,
- * and their teachers. Courses open to all users are also displayed.
- * Courses are displayed on two columns, one for each term in the year.
- * Teachers can move their courses to select the relevant column.
+ * Displays the user's courses for the current term. Courses open to all users are also displayed.
+ * Teachers can add courses.
  *
  * @package    block_mytermcourses
  * @author     Brice Errandonea <brice.errandonea@u-cergy.fr>
@@ -34,7 +32,16 @@
  * Block class definition
  */
 
+require_once($CFG->dirroot.'/blocks/mytermcourses/lib.php');
+
+use core_completion\progress;
+
 class block_mytermcourses extends block_base {
+	const COURSECAT_SHOW_COURSES_COLLAPSED = 10;
+    const COURSECAT_SHOW_COURSES_AUTO = 15; /* will choose between collapsed and expanded automatically */
+    const COURSECAT_SHOW_COURSES_EXPANDED = 20;
+    const COURSECAT_SHOW_COURSES_EXPANDED_WITH_CAT = 30;
+
     public function init() {
         $this->title = get_string('mytermcourses', 'block_mytermcourses');
     }
@@ -45,30 +52,25 @@ class block_mytermcourses extends block_base {
         if ($this->content !== null) {
             return $this->content;
         }
+        $sitecontext = context_system::instance();
+
         $this->content = new stdClass;
 	    $this->content->text = '';
+        //$this->content->text .= "<a href='$CFG->wwwroot/index.php?redirect=0'><button class='btn btn-secondary' style='margin:5px'>".get_string('home')."</button></a>&nbsp;&nbsp"; //TODO : Si ce bouton est confirmé, mettre ce texte dans les fichiers de langue.
+        $this->content->text .= "<a href='$CFG->wwwroot/blocks/mytermcourses/oldcourses.php'><button class='btn btn-secondary' style='margin:5px'>".get_string('myoldcourses', 'block_mytermcourses')."</button></a>&nbsp;&nbsp";
+        if (has_capability('block/mytermcourses:createcourse', $sitecontext)) {
+			$this->content->text .= "<a href='$CFG->wwwroot/blocks/mytermcourses/addcourse.php'><button class='btn btn-secondary btn-success' style='margin:5px'>".get_string('addcourse', 'block_mytermcourses')."</button></a>&nbsp;&nbsp;";
+		} else {
+			$this->content->text .= "<button class='btn btn-secondary' style='margin:5px'>".get_string('cantseecourse', 'block_mytermcourses')."</button>&nbsp;&nbsp;";
+		}
+
+        $this->content->text .= '<br><br>';
 
         // Style for category titles.
         $bgcolor = '#731472';
-        $style = "font-weight:bold;padding:5px;color:white;background-color:$bgcolor;width:100%";
+        $style = "font-weight:bold;padding:5px;padding-left:10px;color:white;background-color:$bgcolor;width:100%";
+        $courses = $this->getusercourses();
 
-        // Common categories.
-        if ($this->config->common) {
-            $commoncategoriesid = explode(';', $this->config->common);
-            $commoncategories = $this->sortcategories($commoncategoriesid);
-            foreach ($commoncategories as $commoncategory) {
-                $commoncourses = $DB->get_records('course', array('category' => $commoncategory->id));
-                $this->content->text .= "<p style='$style'>$commoncategory->name</p>";
-                $this->content->text .= "<table>";
-                $commoncolumns = $this->preparecolumns($commoncategory, $commoncourses);
-                $this->displaycourses($commoncolumns);
-                $this->content->text .= "<tr><td></td><td></td></tr></table>";
-            }
-        }
-
-        // User's courses.
-        $courses = enrol_get_my_courses('summary, summaryformat', 'idnumber ASC');
-        
         if (!$courses) {
             $this->content->text .= get_string('notenrolled', 'block_mytermcourses');
         } else {
@@ -81,18 +83,44 @@ class block_mytermcourses extends block_base {
             }
             $categories = $this->sortcategories($categoriesid);
 
-            // Display categories and courses.
+            // Display categories and courses.            
             foreach ($categories as $category) {
-                $category = $DB->get_record('course_categories', array('id' => $category->id));                
+                $category = $DB->get_record('course_categories', array('id' => $category->id));
                 $this->content->text .= "<p style='$style'>$category->name</p>";
-                //~ $this->content->text .= "<table>";
                 $this->displaycourses($courses, $category);
-                //~ $this->content->text .= "<tr><td></td><td></td></tr></table>";
             }
         }
+
         $this->content->footer = '';
         return $this->content;
     }
+
+    private function getusercourses() {
+		global $DB;
+        $courses = enrol_get_my_courses('summary, summaryformat', 'idnumber ASC');        
+        $courseids = array();
+        foreach ($courses as $course) {
+			$courseids[] = $course->id;
+		}
+		reset($courses);
+        // Common categories.
+        if ($this->config->common) {
+            $commoncategoriesid = explode(';', $this->config->common);
+            $commoncategories = $this->sortcategories($commoncategoriesid);            
+            foreach ($commoncategories as $commoncategory) {
+                $commoncourses = $DB->get_records('course', array('category' => $commoncategory->id));
+                if (!$commoncourses) {
+					continue;
+				}
+                foreach ($commoncourses as $commoncourse) {
+					if (!in_array($commoncourse->id, $courseids)) {
+						$courses[] = $commoncourse;
+					}
+				}
+            }
+        }        
+        return $courses;
+	}
 
     public function sortcategories($categoriesid) {
         global $DB;
@@ -106,10 +134,22 @@ class block_mytermcourses extends block_base {
             $categoriesorder[$categoryid] = $DB->get_field('course_categories', 'idnumber', array('id' => $categoryid));
         }
         asort($categoriesorder);
-        foreach ($categoriesorder as $categoryid => $order) {
+        $lastcategoryid = '';
+        foreach ($categoriesorder as $categoryid => $idnumber) {
             $category = $DB->get_record('course_categories', array('id' => $categoryid));
-            array_push($categories, $category);
+            /**
+             * S'il y a un espace personnel, les espaces collaboratifs ne seront pas affichés (on ne veut pas d'étudiants dans les espaces collaboratifs).
+             */
+            if (($idnumber == 'COLLAB')||($idnumber == 'PERSO')) {
+				$lastcategoryid = $categoryid;
+			} else {
+				array_push($categories, $category);
+			}
         }
+        if ($lastcategoryid) {
+			$lastcategory = $DB->get_record('course_categories', array('id' => $lastcategoryid));
+			array_push($categories, $lastcategory);
+		}
         return $categories;
     }
 
@@ -133,31 +173,17 @@ class block_mytermcourses extends block_base {
     }
 
     public function displaycourses($courses, $category) {
-		global $PAGE;
-		$courserenderer = $PAGE->get_renderer('core', 'course');
-		$numcourse = 0;
-		$this->content->text .= '<div>';
+		global $PAGE;		
+		$this->content->text .= '<div style="overflow:auto">';
         foreach ($courses as $course) {
 			if ($course->category == $category->id) {
-				$this->content->text .= '<div';
-				if (!$numcourse) {
-					$this->content->text .= ' style="width:80%"';
-				}
-				$this->content->text .= '>';
-				$this->content->text .= $courserenderer->course_info_box($course);
-				$this->content->text .= '</div>';
-				if (!$numcourse) {					
-					//~ $this->displaylogo($category);
-				}
-				//~ $this->displaycourse($course);
-				$numcourse++;
+				$this->content->text .= block_mytermcourses_displaycourse($course);				
 			}
 		}
 		$this->content->text .= '</div>';
 		$this->content->text .= '<br><br>';
     }
-    
-    
+
     public function displaylogo($category) {
 		global $DB;
 		$logofile = 'logoucp.png';
@@ -170,43 +196,23 @@ class block_mytermcourses extends block_base {
 		}
 		$this->content->text .=  "<p style='margin-top:-45px;text-align:right'><img src='$CFG->wwwroot/$logofile' style='width:130px'></p>";
 	}
-    
-    
 
-    public function displaycourse($course) {
-        global $CFG, $DB, $USER;
-        $url = $CFG->wwwroot.'/course/view.php?id='.$course->id;
-        $this->content->text .= "<a href='$url' style='font-weight:bold' title='$course->shortname'>$course->fullname</a><br/>";
+    public function courseprogress($course) {
+		global $USER;
+		$completion = new \completion_info($course);
+        if (!$completion->is_enabled()) {
+            return null;
+        }
+        $percentage = progress::get_course_progress_percentage($course);
+        if (!is_null($percentage)) {
+            $percentage = floor($percentage);
+        }
+        $courseprogress = array();
+        $courseprogress['completed'] = $completion->is_course_complete($USER->id);
+        $courseprogress['progress'] = $percentage;
+        return $courseprogress;
+	}
 
-        // Teachers.
-        $coursecontextid = $DB->get_field('context', 'id', array('contextlevel' => CONTEXT_COURSE, 'instanceid' => $course->id));
-        $teacherassignments = $DB->get_records('role_assignments', array('roleid' => 3, 'contextid' => $coursecontextid));
-        $nbteachers = 0;        
-        $teachernames = '';
-        foreach ($teacherassignments as $teacherassignment) {
-            $teacher = $DB->get_record('user', array('id' => $teacherassignment->userid)); 
-            $urluser = $CFG->wwwroot.'/user/view.php?id='.$teacher->id.'&course='.$course->id;       
-            if ($nbteachers) {
-                $teachernames .= ' - ';
-            }
-            $nbteachers++;
-            $teachernames .= "<a href='$urluser'>$teacher->firstname $teacher->lastname</a>";
-        }
-        if ($teachernames) {
-			$this->content->text .= '<strong>';
-			if ($nbteachers > 1) {
-				$this->content->text .= get_string('defaultcourseteachers');
-			} else {
-				$this->content->text .= get_string('defaultcourseteacher');
-			}
-            $this->content->text .= '</strong> : '.$teachernames;
-		}
-        
-        if ($course->summary) {
-            $this->content->text .= "<br><span style='font-size:11'>$course->summary</span>";
-        }
-        $this->content->text .= "<br>";
-    }
 
     public function specialization() {
         if (isset($this->config)) {
@@ -216,6 +222,10 @@ class block_mytermcourses extends block_base {
                 $this->title = $this->config->changetitle;
             }
         }
+    }
+    
+    public function has_config() {
+        return true;
     }
 }
 
