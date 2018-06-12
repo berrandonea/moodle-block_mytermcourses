@@ -52,7 +52,6 @@ class block_mytermcourses_cohorts_form extends moodleform {
 		}
         $availablecoursecohorts = $DB->get_records('local_cohortmanager_info', array('codeelp' => $courseidnumber));
 
-        
         $mform =& $this->_form;
         $mform->addElement('header', 'generalheader', get_string('suggestedcohorts', 'block_mytermcourses'));
         //~ $mform->addElement('static', 'cohortdef', '', '<p style="text-align:justify">'.get_string('cohortsare', 'block_mytermcourses').'</p>');
@@ -64,10 +63,12 @@ class block_mytermcourses_cohorts_form extends moodleform {
 
         $mform->addElement('hidden', 'id', $COURSE->id);
         $mform->setType('id', PARAM_INT);
-        
-        
-        foreach ($availablecoursecohorts as $availablecoursecohort) {
+
+        foreach ($availablecoursecohorts as $availablecoursecohort) {			
             $cohortlocalname = $DB->get_field('local_cohortmanager_names', 'cohortname', array('cohortid' => $availablecoursecohort->cohortid));
+            if (!$cohortlocalname) {
+				$cohortlocalname = $DB->get_field('cohort', 'name', array('id' => $availablecoursecohort->cohortid));
+			}
             $cohortcode = $DB->get_field('cohort', 'idnumber', array('id' => $availablecoursecohort->cohortid));
             if ($availablecoursecohort->teacherid == $USER->id) {
                 $checked = 1;
@@ -82,6 +83,5 @@ class block_mytermcourses_cohorts_form extends moodleform {
 
         }
         $this->add_action_buttons();
-	}
-       
+	}       
 }

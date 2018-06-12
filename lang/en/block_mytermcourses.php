@@ -37,6 +37,7 @@
 
 $string['pluginname'] = 'My term courses';
 $string['mytermcourses'] = 'My term courses';
+$string['mytermcourses:createcourse'] = 'Create a new course (through block_mytermcourses)';
 $string['mytermcourses:addinstance'] = 'Add a new My term courses block';
 $string['mytermcourses:myaddinstance'] = 'Add a new My term courses block to the My Moodle page';
 $string['changetitle'] = 'Change block title';
@@ -65,6 +66,9 @@ $string['createagain'] = 'Create again';
 $string['reallycreateagain'] = 'Do you really want to create another course for this one ?';
 $string['chooseformat'] = 'Please choose a format for your course';
 $string['choosecategory'] = 'Please choose a course category';
+$string['choosefaculty'] = 'Please choose a faculty';
+$string['chooselevel'] = 'Please choose a level';
+$string['choosetraining'] = 'Please choose a training';
 $string['suggestedcohorts'] = 'Suggested cohorts';
 $string['mutualchooseany'] = 'If the course you want to create is common to several of the above trainings, please click any of the relevant trainings';
 $string['categorynotfound'] = 'Can\'t find the category you\'re looking for ? You can create a new one. Please don\'t use this too often : it\'s better to create new categories in Apogée rather than here.';
@@ -81,3 +85,5 @@ $string['cohortsare'] = 'Students cohorts are Apogée groups. If you tie a cohor
 $string['noknowncohorts'] = 'We don\'t have any information about cohorts you might want to tie to this course.';
 $string['choosecohorts'] = 'According to our knowledge, you could be interested in these cohorts. Please check there is no mistake.';
 $string['alllevelcohorts'] = 'Can\'t find the cohorts you\'re looking for ? Please click here for all the cohorts available in';
+$string['tryenroldemands'] = "Please check you are part of a cohort your teacher linked to this course. Or search the <a href='course/index.php'>courses list</a>. Maybe you can request for enrolment in this course (if your teacher enabled this possibility).";
+

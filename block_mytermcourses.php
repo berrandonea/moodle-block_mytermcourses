@@ -55,13 +55,16 @@ class block_mytermcourses extends block_base {
         $sitecontext = context_system::instance();
 
         $this->content = new stdClass;
-	    $this->content->text = '';
-        //$this->content->text .= "<a href='$CFG->wwwroot/index.php?redirect=0'><button class='btn btn-secondary' style='margin:5px'>".get_string('home')."</button></a>&nbsp;&nbsp"; //TODO : Si ce bouton est confirmé, mettre ce texte dans les fichiers de langue.
-        $this->content->text .= "<a href='$CFG->wwwroot/blocks/mytermcourses/oldcourses.php'><button class='btn btn-secondary' style='margin:5px'>".get_string('myoldcourses', 'block_mytermcourses')."</button></a>&nbsp;&nbsp";
+	    $this->content->text = '';        
+        $this->content->text .= "<a href='$CFG->wwwroot/blocks/mytermcourses/oldcourses.php'><button id='oldcoursesbutton' class='btn btn-success' style='margin:5px'>"
+            .get_string('myoldcourses', 'block_mytermcourses')."</button></a>&nbsp;&nbsp";
         if (has_capability('block/mytermcourses:createcourse', $sitecontext)) {
-			$this->content->text .= "<a href='$CFG->wwwroot/blocks/mytermcourses/addcourse.php'><button class='btn btn-secondary btn-success' style='margin:5px'>".get_string('addcourse', 'block_mytermcourses')."</button></a>&nbsp;&nbsp;";
+			$this->content->text .= "<a href='$CFG->wwwroot/blocks/mytermcourses/addcourse.php'><button id='addcoursebutton' class='btn btn-info' style='margin:5px'>"
+			    .get_string('addcourse', 'block_mytermcourses')."</button></a>&nbsp;&nbsp;";
 		} else {
-			$this->content->text .= "<button class='btn btn-secondary' style='margin:5px'>".get_string('cantseecourse', 'block_mytermcourses')."</button>&nbsp;&nbsp;";
+			$this->content->text .= "<button class='btn btn-secondary' style='margin:5px' onclick='block_mytermcourses_notfound()'>"
+			    .get_string('cantseecourse', 'block_mytermcourses')."</button>&nbsp;&nbsp;";
+			$this->content->text .= "<div style='display:none' id='notfounddiv'>".get_string('tryenroldemands', 'block_mytermcourses')."</div>";
 		}
 
         $this->content->text .= '<br><br>';
@@ -83,8 +86,15 @@ class block_mytermcourses extends block_base {
             }
             $categories = $this->sortcategories($categoriesid);
 
-            // Display categories and courses.            
+            // Display categories and courses.
             foreach ($categories as $category) {
+				if ($this->config->common) {
+                    $commoncategoriesid = explode(';', $this->config->common);
+                    if (in_array($category->id, $commoncategoriesid)) {
+						$bgcolor = '#A56E9D';
+                        $style = "font-weight:bold;padding:5px;padding-left:10px;color:white;background-color:$bgcolor;width:100%";
+					}
+				}
                 $category = $DB->get_record('course_categories', array('id' => $category->id));
                 $this->content->text .= "<p style='$style'>$category->name</p>";
                 $this->displaycourses($courses, $category);
@@ -97,7 +107,7 @@ class block_mytermcourses extends block_base {
 
     private function getusercourses() {
 		global $DB;
-        $courses = enrol_get_my_courses('summary, summaryformat', 'idnumber ASC');        
+        $courses = enrol_get_my_courses('summary, summaryformat', 'idnumber ASC');
         $courseids = array();
         foreach ($courses as $course) {
 			$courseids[] = $course->id;
@@ -106,19 +116,24 @@ class block_mytermcourses extends block_base {
         // Common categories.
         if ($this->config->common) {
             $commoncategoriesid = explode(';', $this->config->common);
-            $commoncategories = $this->sortcategories($commoncategoriesid);            
+            $commoncategories = $this->sortcategories($commoncategoriesid);
             foreach ($commoncategories as $commoncategory) {
                 $commoncourses = $DB->get_records('course', array('category' => $commoncategory->id));
                 if (!$commoncourses) {
 					continue;
 				}
                 foreach ($commoncourses as $commoncourse) {
+					// Only get courses with guest access enabled.
+					$guestenrol = $DB->get_record('enrol', array('enrol' => 'guest', 'courseid' => $commoncourse->id));
+					if ($guestenrol->status) { // status = 1 means 'disabled method'.
+						continue;
+					}
 					if (!in_array($commoncourse->id, $courseids)) {
 						$courses[] = $commoncourse;
 					}
 				}
             }
-        }        
+        }
         return $courses;
 	}
 
@@ -135,13 +150,18 @@ class block_mytermcourses extends block_base {
         }
         asort($categoriesorder);
         $lastcategoryid = '';
+        $afterlastcategoryid = '';
         foreach ($categoriesorder as $categoryid => $idnumber) {
             $category = $DB->get_record('course_categories', array('id' => $categoryid));
             /**
              * S'il y a un espace personnel, les espaces collaboratifs ne seront pas affichés (on ne veut pas d'étudiants dans les espaces collaboratifs).
              */
             if (($idnumber == 'COLLAB')||($idnumber == 'PERSO')) {
-				$lastcategoryid = $categoryid;
+				if ($lastcategoryid) {
+					$afterlastcategoryid = $categoryid;
+				} else {
+					$lastcategoryid = $categoryid;
+				}				
 			} else {
 				array_push($categories, $category);
 			}
@@ -149,6 +169,10 @@ class block_mytermcourses extends block_base {
         if ($lastcategoryid) {
 			$lastcategory = $DB->get_record('course_categories', array('id' => $lastcategoryid));
 			array_push($categories, $lastcategory);
+		}
+        if ($afterlastcategoryid) {
+			$afterlastcategory = $DB->get_record('course_categories', array('id' => $afterlastcategoryid));
+			array_push($categories, $afterlastcategory);
 		}
         return $categories;
     }

@@ -72,13 +72,26 @@ function block_mytermcourses_createcourse($coursename, $courseidnumber, $categor
     $newcontext = context_course::instance($newcourse->id, MUST_EXIST);
 
     // Format option for the new course.
+    $now = time();
+    $courseconfig = get_config('moodlecourse');
     $numsectionsoption = new stdClass();
     $numsectionsoption->courseid = $newcourse->id;
     $numsectionsoption->format = 'topics';
     $numsectionsoption->sectionid = 0;
-    $numsectionsoption->name = 'numsections';
-    $numsectionsoption->value = 2;
+    $numsectionsoption->name = 'numsections';  
+    $numsectionsoption->value = $courseconfig->numsections;
     $DB->insert_record('course_format_options', $numsectionsoption);
+    for ($i = 1; $i <= $numsectionsoption->value; $i++) {
+		$coursesection = new stdClass();
+		$coursesection->course = $newcourse->id;
+		$coursesection->section = $i;
+		$coursesection->summary = '';
+		$coursesection->summaryformat = 1;
+		$coursesection->sequence = '';
+		$coursesection->visible = 1;
+		$coursesection->timemodified = $now;
+		$DB->insert_record('course_sections', $coursesection);
+	}
 
     // Current user is enroled in the new course, with appropriate role.
     $enrolmethod = $DB->get_record('enrol', array('enrol' => 'manual', 'courseid' => $newcontext->instanceid));
@@ -316,7 +329,7 @@ function block_mytermcourses_fetchcourse($connection, $fetchedcourseid, $newcour
     $fetchcommand = "scp enp17@enp16.u-cergy.fr:/var/movingcourses/course$fetchedcourseid.mbz /var/enp16courses";
     $retry = 1;
     $tries = 0;
-    while ($retry && $tries < 10) {    // Retry fetching if it didn't work, but not more than 10 times.
+    while ($retry && $tries < 20) {    // Retry fetching if it didn't work, but not more than 20 times.
         $fetchoutput = system($fetchcommand, $retry);
         $tries++;
 	}
@@ -334,18 +347,24 @@ function block_mytermcourses_fetchcourse($connection, $fetchedcourseid, $newcour
     $restoreoutput = system($restorecommand);
     $restoretable = explode("New course ID for ", $restoreoutput);
 
-    $errorstring = "<h3>Une erreur s'est produite. Les indications ci-dessus (s'il y en a) peuvent aider le Service d'ingénierie pédagogique à résoudre ce problème.</h3>";
+    $errorstring = "<h3>Une erreur s'est produite. Les indications ci-dessus (s'il y en a) peuvent aider le Service d'ingénierie pédagogique à résoudre ce problème. S'il n'y en a pas, essayez de recharger cette page : il arrive que ça fonctionne la deuxième fois.</h3>";
     if ($restoretable) {
 		if (isset($restoretable[1])) {
 		    block_mytermcourses_preparerestoredcourse($restoretable, $newcourseidnumber);
 		} else {
-			echo $errorstring;
-			exit;
+			block_mytermcourses_error($errorstring);
 		}
 	} else {
-		echo $errorstring;
-		exit;
+		block_mytermcourses_error($errorstring);
 	}
+}
+
+function block_mytermcourses_error($errorstring) {
+	global $OUTPUT;
+	echo $OUTPUT->header();
+	echo $errorstring;
+	echo $OUTPUT->footer();
+	exit;
 }
 
 function block_mytermcourses_tryidnumber($table, $triedidnumber, $i) {
@@ -415,24 +434,25 @@ function block_mytermcourses_displaycourse($course) {
     global $CFG, $DB, $PAGE, $USER;
     $coursewidth = 280;
     $courseheight = 160;
-    $coursestyle = 'border:1px solid gray;margin:10px;float:left;padding:10px;border-radius:5px';
+    $coursestyle = 'border:1px solid gray;margin:10px;float:left;padding:10px;border-radius:5px;overflow:hidden';
     $courseurl = $CFG->wwwroot.'/course/view.php?id='.$course->id;
     $coursecontextid = $DB->get_field('context', 'id', array('contextlevel' => CONTEXT_COURSE, 'instanceid' => $course->id));
     $teacherassignments = $DB->get_records('role_assignments', array('roleid' => 3, 'contextid' => $coursecontextid));
     $nbteachers = count($teacherassignments);
-	$html = "<div style='width:$coursewidth;height:$courseheight;$coursestyle'>";
+	//~ $title = addslashes(block_mytermcourses_coursesummary($course));
+	$html = "<div style='width:$coursewidth;height:$courseheight;$coursestyle' class='coursecard'>";
+	$html .= "<div style='overflow:hidden'>";	
 	$html .= "<a style='font-weight:bold;font-size:16' href='$courseurl'>$course->fullname</a>";
-	$html .= "<br><span style='font-size:10'>$course->idnumber</span><br>";
+	$html .= "<div style='font-size:10;margin:5px;margin-left:5px;float:right'>$course->idnumber</div>";
 	$imageheight = '80px';
-	$imagewidth = '130px';
+	$imagewidth = '110px';
 	$html .= "<div style='text-align:center;max-width:$imagewidth;max-height:$imageheight;float:left;margin:10px'>";
 	$html .= block_mytermcourses_courseimage($course, $imagewidth, $imageheight);
 	$html .= "</div>";
 	$html .= "<div style='float:right'>";
 	$html .= block_mytermcourses_coursecontacts($course);
-	$html .= "</div>";
-	//~ $html .= block_mytermcourses_coursesummary($course);
-	$html .= '</div>';
+	$html .= "</div>";	
+	$html .= '</div></div>';
 	return $html;
 }
 
@@ -513,9 +533,9 @@ function block_mytermcourses_coursecontacts($courserecord) {
         $content .= '<span style="font-weight:bold">'.$coursecontact['rolename'].$s.' :</span>';
         $content .= '<ul>';
         $numteacher = 1;
-        foreach ($courseteachers as $userid => $courseteacher) {            
+        foreach ($courseteachers as $courseteacher) {            
             $name = html_writer::link(new moodle_url('/user/view.php',
-                                                     array('id' => $userid, 'course' => SITEID)),
+                                                     array('id' => $courseteacher['user']->id, 'course' => SITEID)),
                                                      $courseteacher['username']);
             if ($numteacher == 5) {
 				$content .= '<li>etc.</li>';
@@ -537,14 +557,15 @@ function block_mytermcourses_coursesummary($courserecord) {
     $content = '';
     // display course summary
     if ($course->has_summary()) {
-        $content .= html_writer::start_tag('div', array('class' => 'summary', 'style' => 'font-size:11'));
+        //~ $content .= html_writer::start_tag('div', array('class' => 'summary', 'style' => 'font-size:11'));
         $chelper = new coursecat_helper();
         //~ $chelper->set_show_courses(self::COURSECAT_SHOW_COURSES_EXPANDED);
         $chelper->set_show_courses(1);
         $content .= $chelper->get_course_formatted_summary($course,
                 array('overflowdiv' => true, 'noclean' => true, 'para' => false));
-        $content .= html_writer::end_tag('div'); // .summary
+        //~ $content .= html_writer::end_tag('div'); // .summary
     }
+    var_dump($content);
     return $content;
 }
 
@@ -564,7 +585,7 @@ function block_mytermcourses_availablevets() {
             $myvets[$vetcode]->vetcodeyear = "$CFG->yearprefix-$vetcode";
             $myvets[$vetcode]->vetname = $xmlvet->getAttribute('libelle_long_version_etape');
             $myvets[$vetcode]->courses = block_mytermcourses_availablecourses($xmlvet, $myvets[$vetcode]->vetcodeyear);
-		}		
+		}
 	}
 	return $myvets;
 }
@@ -603,8 +624,8 @@ function block_mytermcourses_availablegroups($xmlcourse, $vetcodeyear) {
 
 function block_mytermcourses_showavailablecourses($availablevet) {
 	global $DB;
-	$coursecategory = $DB->get_record('course_categories', array('idnumber' => $availablevet->vetcodeyear));
-	foreach ($availablevet->courses as $availablecourse) {
+	$coursecategory = $DB->get_record('course_categories', array('idnumber' => $availablevet->vetcodeyear));	
+	foreach ($availablevet->courses as $availablecourse) {		
 		$alreadycourses = block_mytermcourses_similarcourses($availablecourse->coursecodeyear);
 		echo "<div style='text-align:left'>";
 		echo "<div  style='float:left;margin-right:30px'>";
@@ -617,11 +638,6 @@ function block_mytermcourses_showavailablecourses($availablevet) {
 				$alreadycoursesgroup .= block_mytermcourses_displaycourse($alreadycourse);
 			}
 			$alreadycoursesgroup .= '</div>';
-			//~ $string['alreadycreated'] = 'Déjà créé';
-            //~ $string['createagain'] = 'Créer à nouveau';
-            //~ $string['reallycreateagain'] = 'Il y a déjà un espace de cours Moodle pour ce même cours Apogée. Voulez-vous vraiment en créer un autre ?';
-			
-
 			$againconfirm = '<div style="text-align:center">'.get_string('reallycreateagain', 'block_mytermcourses')
 			    .block_mytermcourses_creationform($coursecategory->id, $availablecourse->coursecodeyear, $availablecourse->coursename).'</div>';
 
@@ -650,21 +666,39 @@ function block_mytermcourses_creationform($categoryid, $courseidnumber, $coursen
 	return $html;
 }
 
-function block_mytermcourses_preparenewcourse($newcourse) {
-
-	//TODO
-
-}
-
 function block_mytermcourses_choosecategory($upcategory) {
 	global $CFG, $DB, $OUTPUT;
-	$backurl = "addcourse.php?category=$upcategory->parent";
-	echo "<p><a href='$backurl'>".get_string('back')."</a></p>";
-	$categories = $DB->get_records('course_categories', array('parent' => $upcategory->id));
-	$firstcategory = $DB->get_record('course_categories', array('parent' => $upcategory->id));
+	$paramskip = optional_param('skip', 0, PARAM_INT);
+	$parentcategory = $DB->get_record('course_categories', array('id' => $upcategory->parent));
+	if ($paramskip) {
+		if ($parentcategory) {
+			$backurl = "addcourse.php?category=$parentcategory->parent";
+		} else {
+			$backurl = "$CFG->wwwroot/my/index.php";
+		}		
+	} else {
+		$backurl = "addcourse.php?category=$upcategory->parent";
+	}	
+	$categories = $DB->get_records('course_categories', array('parent' => $upcategory->id));	
 	if ($categories) {
-		echo $OUTPUT->heading(get_string('choosecategory', 'block_mytermcourses'));
+		$firstcategory = current($categories);
+	    $maincoursecategory = $DB->get_record('course_categories', array('idnumber' => $CFG->yearprefix));
+		if (count($categories) == 1) { // S'il n'y a qu'une catégorie, on y va tout de suite.			
+			header("Location: addcourse.php?category=$firstcategory->id&skip=1");
+			//~ $url = new moodle_url('/blocks/mytermcourses/addcourse.php', array('category' => $firstcategory->id, 'skip' => 1));
+			//~ redirect($url);
+		}
 		$haschildren = $DB->record_exists('course_categories', array('parent' => $firstcategory->id));
+		echo $OUTPUT->header();
+	    echo "<p><a href='$backurl'>".get_string('back')."</a></p>";
+	    if ($upcategory->id == $maincoursecategory->id) {
+			$heading = get_string('choosefaculty', 'block_mytermcourses');
+		} else if ($haschildren) {
+			$heading = get_string('chooselevel', 'block_mytermcourses');
+		} else {
+			$heading = get_string('choosetraining', 'block_mytermcourses');
+		}	    
+		echo $OUTPUT->heading($heading);
 		if (!$haschildren) {
 			echo "<p>".get_string('mutualchooseany', 'block_mytermcourses')."</p>";
 		}
@@ -679,6 +713,8 @@ function block_mytermcourses_choosecategory($upcategory) {
 		}
 	} else {
         // ELP page.
+        echo $OUTPUT->header();
+	    echo "<p><a href='$backurl'>".get_string('back')."</a></p>";
         echo $OUTPUT->heading(get_string('createwhichcourse', 'block_mytermcourses'));
         echo "<div style='text-align:center'>";
         $categorystyle = "text-align:left;font-weight:bold;padding:5px;color:white;background-color:gray;width:100%";
@@ -706,8 +742,14 @@ function block_mytermcourses_notfoundform($nature, $parentid) {
 
 function block_mytermcourses_choosecourse($category) {
 	global $DB;
+	$separatorposition = strpos($category->idnumber, '-');
+	$categorycodefirstchar = substr($category->idnumber, $separatorposition+1, 1);
 	$offercourses = $DB->get_records('local_pedagooffer', array('categoryid' => $category->id), 'name');
 	foreach ($offercourses as $offercourse) {
+		$coursecodefirstchar = substr($offercourse->codeelp, 0, 1);
+		if ($coursecodefirstchar != $categorycodefirstchar) {
+			continue; // Ne pas afficher les cours hors composantes à l'intérieur des composantes.
+		}
 		$coursecodeyear = "$category->idnumber-$offercourse->codeelp";
 		$alreadycourses = block_mytermcourses_similarcourses($coursecodeyear);
 		echo "<div style='text-align:left'>";
@@ -772,6 +814,16 @@ function block_mytermcourses_availables() {
 	    step2div.style.display = 'none';
 	}
 	availablesdiv.style.display = 'block';
+}
+
+function block_mytermcourses_notfound() {
+	notfounddiv = document.getElementById('notfounddiv');
+	visible = notfounddiv.style.display;
+	if (visible == 'none') {
+		notfounddiv.style.display = 'block';
+	} else {
+		notfounddiv.style.display = 'none';
+	}
 }
 </script>
 

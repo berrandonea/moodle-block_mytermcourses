@@ -81,8 +81,6 @@ if ($courseidnumber && confirm_sesskey()) {
     header("Location: cohorts.php?id=$newcourse->id");
 }
 
-echo $OUTPUT->header();
-
 // Failed category creation.
 if ($categoryparentid && !$newcategoryname) {
 	echo "<p style='text-align:center;color:red'>".get_string('missingcategoryname', 'block_mytermcourses')."</p>";
@@ -103,52 +101,34 @@ if ($categoryid) {
 	exit;
 }
 
-// Select initial cohorts for a new course.
-//~ if ($selectcohorts) {
-	//~ echo $OUTPUT->heading(get_string('creatingcourse', 'block_mytermcourses')."$coursename ($courseidnumber)");
-	//~ $category = $DB->get_record('course_categories', array('id' => $categoryid));
-	//~ echo " dans la catégorie $category->name<br><br>";
-	//~ $newcourse = block_mytermcourses_createcourse($coursename, $courseidnumber, $categoryid);
-        //~ $formdata = array();
-	    //~ $formdata['courseidnumber'] = $courseidnumber;
-	    //~ $mform = new block_mytermcourses_cohorts_form();
-        //~ $mform->set_data($formdata); 
-        //~ if ($submitteddata = $mform->get_data()) {
-			//~ //TODO
-	    //~ } else {
-            //~ echo '<p style="text-align:justify">'.get_string('choosecohorts', 'block_mytermcourses').'</p>';
-            //~ $mform->display();		
-	    //~ }
-	
-	//~ echo $OUTPUT->footer();
-	//~ exit;
-//~ }
-
- //find . -name "*.txt" -type f -exec sed -i "s/mytermcourses/ucpcoursecreation/g" {} \;
-  
 $availablevets = block_mytermcourses_availablevets();
 
-echo '<p></p>';
-//~ echo "<div id='step1' style='font-size:18;text-align:center'>";
-//~ echo "<p>Aviez-vous, en 2017-2018, utilisé la plateforme CoursUCP pour ce même cours (celui que vous voulez créer) ?</p>";
-//~ echo "<a href='oldcourses.php'><button class='btn btn-primary'>Oui</button></a>&nbsp;&nbsp;";
-//~ echo "<button class='btn btn-secondary' onclick='javascript:block_mytermcourses_availables()'>Non</button>";
-//~ echo "</div>";
-
-echo "<div id='availables' style='text-align:center'>";
-echo "<p style='font-size:18'>".get_string('createwhichcourse', 'block_mytermcourses')."</p>";
-$categorystyle = "text-align:left;font-weight:bold;padding:5px;color:white;background-color:gray;width:100%";
-foreach ($availablevets as $availablevet) {
-	echo "<br><p style='$categorystyle'>$availablevet->vetname";
-	echo "&nbsp; &nbsp;<span style='font-size:10'>($availablevet->vetcodeyear)</span></p>";	
-	block_mytermcourses_showavailablecourses($availablevet);
-}
-echo '<br>';
 
 if (isset ($CFG->yearprefix)) {
     $maincoursecategory = $DB->get_record('course_categories', array('idnumber' => $CFG->yearprefix));
     if ($maincoursecategory) {
-	    echo "<a class='btn btn-secondary' href='addcourse.php?category=$maincoursecategory->id'>Il n'est pas dans cette liste</a>";
+        $maincategoryurl = "addcourse.php?category=$maincoursecategory->id";
+        if (!count($availablevets)) {
+			header("Location: $maincategoryurl&skip=1");
+		}
+	}
+    //~ $maincategoryurl = new moodle_url("/blocks/mytermcourses/addcourse.php", array('category' => $maincoursecategory->id, 'skip' => 1));
+    //~ if (!count($availablevets)) {
+	    //~ redirect($maincategoryurl);
+    //~ }
+    echo $OUTPUT->header();
+    echo '<p></p>';
+    echo "<div id='availables' style='text-align:left'>";
+    echo "<p style='font-size:18'>".get_string('createwhichcourse', 'block_mytermcourses')."</p>";
+    $categorystyle = "text-align:left;font-weight:bold;padding:5px;color:white;background-color:gray;width:100%";
+    foreach ($availablevets as $availablevet) {
+	    echo "<br><p style='$categorystyle'>$availablevet->vetname";
+	    echo "&nbsp; &nbsp;<span style='font-size:10'>($availablevet->vetcodeyear)</span></p>";	
+	    block_mytermcourses_showavailablecourses($availablevet);
+    }
+    echo '<br>';
+    if ($maincoursecategory) {
+	    echo "<a class='btn btn-secondary' href='$maincategoryurl'>Mon cours n'est pas dans cette liste</a>";
     }
 }
 

@@ -65,6 +65,9 @@ $string['createagain'] = 'Créer à nouveau';
 $string['reallycreateagain'] = 'Il y a déjà un espace de cours Moodle pour ce même cours Apogée. Voulez-vous vraiment en créer un autre ?';
 $string['chooseformat'] = 'Choisissez un format pour votre cours';
 $string['choosecategory'] = 'Choisissez une catégorie de cours';
+$string['choosefaculty'] = 'Choisissez une composante';
+$string['chooselevel'] = 'Choisissez un niveau';
+$string['choosetraining'] = 'Choisissez une formation (VET)';
 $string['suggestedcohorts'] = 'Cohortes suggérées';
 $string['mutualchooseany'] = 'Si le cours que vous créez est mutualisé entre plusieurs des formations ci-dessous, cliquez sur n\'importe laquelle des formations concernées.';
 $string['categorynotfound'] = 'Vous ne trouvez pas la catégorie que vous cherchez ? Vous pouvez en déclarer une nouvelle. Mais évitez d\'utiliser ceci trop souvent : il vaut mieux déclarer les nouvelles catégories dans Apogée plutôt qu\'ici.';
@@ -81,5 +84,6 @@ $string['cohortsare'] = 'Les "cohortes" d\'étudiants correspondent aux groupes 
 $string['noknowncohorts'] = 'Nous n\'avons aucune information concernant les cohortes d\'étudiants que vous pourriez vouloir lier à ce cours.';
 $string['choosecohorts'] = 'D\'après les informations dont nous disposons, ces cohortes peuvent vous intéresser. Merci de vérifier qu\'il n\'y a pas d\'erreur.';
 $string['alllevelcohorts'] = 'Vous ne trouvez pas les cohortes que vous cherchez ? Cliquer ici pour voir toutes les cohortes de';
+$string['tryenroldemands'] = "Vérifiez auprès de votre secrétariat pédagogique que vous êtes inscrit dans le bon groupe Apogée et auprès de votre enseignant qu'il a bien lié ce groupe à ce cours. Sinon, cherchez dans la <a href='../course/index.php'>Liste complète des cours</a>. Vous pourrez peut-être déposer une demande d'inscription (si votre enseignant a activé cette possibilité).";
 
 
