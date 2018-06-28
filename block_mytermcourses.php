@@ -70,7 +70,7 @@ class block_mytermcourses extends block_base {
         $this->content->text .= '<br><br>';
 
         // Style for category titles.
-        $bgcolor = '#731472';
+        $bgcolor = '#731472';        
         $style = "font-weight:bold;padding:5px;padding-left:10px;color:white;background-color:$bgcolor;width:100%";
         $courses = $this->getusercourses();
 

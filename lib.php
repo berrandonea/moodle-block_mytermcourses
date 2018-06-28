@@ -404,7 +404,6 @@ function block_mytermcourses_preparerestoredcourse($restoretable, $newcourseidnu
 		$option->value = 0;
 		$DB->insert_record('course_format_options', $option);
 	}
-
     //TODO : rediriger plutôt vers la page d'affectation des cohortes.
     $courseurl = new moodle_url('/course/view.php', array('id' => $restoredcourseid));			
     redirect($courseurl);
@@ -412,7 +411,6 @@ function block_mytermcourses_preparerestoredcourse($restoretable, $newcourseidnu
 
 function block_mytermcourses_enrolcreator($courseid) {
 	global $DB, $USER;
-
 	$now = time();
 	$manualenrol = $DB->get_record('enrol', array('courseid' => $courseid, 'enrol' => 'manual'));
 	$creatorenrolment = new stdClass();
@@ -424,7 +422,6 @@ function block_mytermcourses_enrolcreator($courseid) {
 	$creatorenrolment->timecreated = $now;
 	$creatorenrolment->timemodified = $now;
 	$DB->insert_record('user_enrolments', $creatorenrolment);
-
 	$role = $DB->get_record('role', array('shortname' => 'editingteacher'));
     $coursecontext = context_course::instance($courseid);
     role_assign($role->id, $USER->id, $coursecontext->id);
@@ -442,7 +439,7 @@ function block_mytermcourses_displaycourse($course) {
 	//~ $title = addslashes(block_mytermcourses_coursesummary($course));
 	$html = "<div style='width:$coursewidth;height:$courseheight;$coursestyle' class='coursecard'>";
 	$html .= "<div style='overflow:hidden'>";	
-	$html .= "<a style='font-weight:bold;font-size:16' href='$courseurl'>$course->fullname</a>";
+	$html .= "<a style='font-weight:bold;font-size:16' href='$courseurl'>$course->shortname</a>";
 	$html .= "<div style='font-size:10;margin:5px;margin-left:5px;float:right'>$course->idnumber</div>";
 	$imageheight = '80px';
 	$imagewidth = '110px';
